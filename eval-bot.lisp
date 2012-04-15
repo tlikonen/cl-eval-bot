@@ -201,14 +201,14 @@
         (unless (gethash word hash)
           (remhash word hash))))))
 
-(defvar *definitions-pathname*
-  (merge-pathnames #p "definitions.lisp" (user-homedir-pathname)))
+(defvar *definitions-pathname* #p"definitions.lisp")
 
 (defun definitions-load ()
   (with-standard-io-syntax
     (let ((*read-eval* nil))
       (handler-case
-          (with-open-file (file *definitions-pathname*
+          (with-open-file (file (merge-pathnames *definitions-pathname*
+                                                 *data-dir*)
                                 :direction :input
                                 :if-does-not-exist :error)
             (bt:with-lock-held ((lock *definitions*))
@@ -228,22 +228,24 @@
 
 (defun definitions-save ()
   (with-standard-io-syntax
-    (handler-case
-        (with-open-file (file *definitions-pathname*
-                              :direction :output
-                              :if-exists :rename)
-          (format file ";;; Eval-bot definitions~%")
-          (bt:with-lock-held ((lock *definitions*))
-            (loop :for key :being :each :hash-key :in (hash *definitions*)
-                  :using (hash-value value)
-                  :do (write (cons key value) :stream file)
-                  (terpri file))
-            (setf (changed *definitions*) nil))
-          (send :terminal "Definitions saved."))
+    (let ((path (merge-pathnames *definitions-pathname* *data-dir*)))
+      (ensure-directories-exist path)
+      (handler-case
+          (with-open-file (file path
+                                :direction :output
+                                :if-exists :rename)
+            (format file ";;; Eval-bot definitions~%")
+            (bt:with-lock-held ((lock *definitions*))
+              (loop :for key :being :each :hash-key :in (hash *definitions*)
+                    :using (hash-value value)
+                    :do (write (cons key value) :stream file)
+                    (terpri file))
+              (setf (changed *definitions*) nil))
+            (send :terminal "Definitions saved."))
 
-      (file-error (c)
-        (send :terminal (format nil "~A: ~A" (type-of c) c))
-        (send :terminal "Save definitions failed.")))))
+        (file-error (c)
+          (send :terminal (format nil "~A: ~A" (type-of c) c))
+          (send :terminal "Save definitions failed."))))))
 
 ;;; General maintainer
 

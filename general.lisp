@@ -20,7 +20,7 @@
   (:use #:cl)
   (:export #:with-thread #:update-sandbox-usage #:delete-unused-packages
            #:delete-all-packages #:list-user-sandbox-packages
-           #:user-to-sandbox-name
+           #:*data-dir* #:user-to-sandbox-name
            #:queue #:queue-add #:queue-pop #:queue-clear
            #:queue-length))
 
@@ -50,6 +50,10 @@
          ,main))))
 
 ;;; Maintenance
+
+(defvar *data-dir*
+  (merge-pathnames (make-pathname :directory '(:relative ".clbot"))
+                   (user-homedir-pathname)))
 
 (defclass sandbox-package ()
   ((lock :reader lock :initform (bt:make-lock "sandbox-package"))
