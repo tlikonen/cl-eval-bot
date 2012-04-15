@@ -6,4 +6,5 @@
    (:file "sandbox-cl" :depends-on ("sandbox-impl"))
    (:file "clhs-url")
    (:file "general")
-   (:file "eval-bot" :depends-on ("general" "sandbox-impl" "clhs-url"))))
+   (:file "eval-bot" :depends-on ("general" "sandbox-impl" "clhs-url"))
+   (:file "filesystem" :depends-on ("general"))))

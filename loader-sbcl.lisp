@@ -28,6 +28,7 @@
 (load "clhs-url.lisp")
 (load "general.lisp")
 (load "eval-bot.lisp")
+(load "filesystem.lisp")
 
 (in-package #:eval-bot)
 
