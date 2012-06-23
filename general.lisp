@@ -22,7 +22,7 @@
            #:delete-all-packages #:list-user-sandbox-packages
            #:*data-dir* #:user-to-sandbox-name
            #:queue #:queue-add #:queue-pop #:queue-clear
-           #:queue-length))
+           #:queue-length #:queue-list))
 
 (in-package #:general)
 
@@ -144,3 +144,5 @@
           (queue-last queue) nil
           (queue-length queue) 0)))
 
+(defun queue-list (queue)
+  (queue-first queue))

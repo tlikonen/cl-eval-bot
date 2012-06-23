@@ -21,13 +21,14 @@
   (:shadow #:directory)
   (:import-from #:general
                 #:queue #:queue-add #:queue-pop #:queue-clear
-                #:queue-length))
+                #:queue-length #:queue-list))
 
 (in-package #:filesystem)
 
 (defclass file ()
   ((id :reader id :initarg :id)
-   (changed :accessor changed :initform t)
+   (changed :accessor changed :initarg :changed :initform t)
+   (atime :accessor atime :initform (get-universal-time))
    (lock :reader lock :initform (bt:make-lock "file"))))
 
 (defclass directory (file)
@@ -37,7 +38,7 @@
    (parent :accessor parent :initarg :parent)))
 
 (defclass regular-file (file)
-  ((content :accessor content :initform nil)))
+  ((content :accessor content :initarg :content :initform nil)))
 
 (defclass pointer () ((id :reader id :initarg :id)))
 (defclass directory-ptr (pointer) nil)
@@ -47,18 +48,129 @@
   ((message :initarg :message))
   (:report (lambda (c s) (princ (slot-value c 'message) s))))
 
-(defvar *root-owners* nil)
-(defvar *root* (make-instance 'directory :id 0
-                              :owners *root-owners* :parent nil))
+(defun make-empty-root-dir ()
+  (make-instance 'directory :id 0 :owners nil :parent nil))
+
 (defvar *fsdata* (make-hash-table))
 
-(defgeneric follow (object))
+(defvar *fsdata-dir*
+  (merge-pathnames (make-pathname :directory '(:relative "fs"))
+                   general:*data-dir*))
 
-(defmethod follow ((ptr directory-ptr))
-  (gethash (id ptr) *fsdata*))
+(defvar *fsdata-filename* (make-pathname :name "fsdata"))
 
-(defmethod follow ((ptr regular-file-ptr))
-  (gethash (id ptr) *fsdata*))
+(defun update-atime (file)
+  (setf (atime file) (get-universal-time)))
+
+(defun release-id (id)
+  (remhash id *fsdata*)
+  (queue-add (gethash :free-ids *fsdata*) id)
+  (write-fsdata-to-disk))
+
+
+;;; Disk read and write
+
+(defun directory-id-component (id)
+  (let* ((unit 1000)
+         (q (truncate id unit)))
+    (make-pathname
+     :directory (list :relative (format nil "~D-~D" (* q unit)
+                                        (+ (* q unit) (1- unit)))))))
+
+(defun make-id-file-pathname (id)
+  (make-pathname :name (format nil "~D" id)
+                 :defaults (merge-pathnames (directory-id-component id)
+                                            *fsdata-dir*)))
+
+(defun write-file-to-disk (file)
+  (let ((path (make-id-file-pathname (id file))))
+    (ensure-directories-exist path)
+    (bt:with-lock-held ((lock file))
+      (with-open-file (s path :direction :output
+                         :if-exists :supersede
+                         :element-type 'character)
+        (print-file file s))
+      (setf (changed file) nil))
+    path))
+
+(defun write-changed-files-to-disk ()
+  (loop :for file :being :each :hash-value :in *fsdata*
+        :if (and (typep file 'file) (changed file))
+        :do (write-file-to-disk file)))
+
+(defun read-regular-file-from-stream-1 (stream)
+  ;; Slots in the stream: id, content.
+  (make-instance 'regular-file :id (read stream) :content (read stream)
+                 :changed nil))
+
+(defun read-directory-from-stream-1 (stream)
+  ;; Slots in the stream: id, parent id, owners, writers, files.
+  (let ((dir (make-instance
+              'directory
+              :id (read stream)
+              :parent (make-instance 'directory-ptr :id (read stream))
+              :owners (read stream)
+              :writers (read stream)
+              :changed nil)))
+    (loop :for (name type id) :in (read stream)
+          :do (setf (gethash name (files dir))
+                    (ecase type
+                      (:r (make-instance 'regular-file-ptr :id id))
+                      (:d (make-instance 'directory-ptr :id id)))))
+    dir))
+
+(defun read-file-from-disk (id)
+  (let ((path (make-id-file-pathname id)))
+    (with-open-file (s path :direction :input
+                       :element-type 'character
+                       :if-does-not-exist :error)
+      (with-standard-io-syntax
+        (let* ((*read-eval* nil)
+               (filetype (read s))
+               (version (read s)))
+          (ecase filetype
+            (:regular-file
+             (ecase version
+               (1 (read-regular-file-from-stream-1 s))))
+            (:directory
+             (ecase version
+               (1 (read-directory-from-stream-1 s))))))))))
+
+(defun write-fsdata-to-disk ()
+  (let ((path (merge-pathnames *fsdata-filename* *fsdata-dir*)))
+    (ensure-directories-exist path)
+    (with-open-file (s path :direction :output
+                       :element-type 'character
+                       :if-exists :supersede)
+      (with-standard-io-syntax
+        ;; file-format-version, id-counter, root-id, free-ids (list)
+        (format s "~S ~S ~S~%~S~%"
+                1
+                (gethash :id-counter *fsdata*)
+                (gethash :root-id *fsdata*)
+                (queue-list (gethash :free-ids *fsdata*)))))))
+
+(defun read-fsdata-from-disk ()
+  (let ((path (merge-pathnames *fsdata-filename* *fsdata-dir*)))
+    (with-open-file (s path :direction :input
+                       :element-type 'character
+                       :if-does-not-exist :error)
+      (with-standard-io-syntax
+        (let* ((*read-eval* nil)
+               (version (read s)))
+          (ecase version
+            (1 ;; id-counter, root-id, free-ids (list)
+             (clrhash *fsdata*)
+             (setf (gethash :id-counter *fsdata*) (read s)
+                   (gethash :root-id *fsdata*) (read s)
+                   (gethash :free-ids *fsdata*) (make-instance 'queue))
+             (loop :for id :in (read s)
+                   :do (queue-add (gethash :free-ids *fsdata*) id)))))))))
+
+(defun from-ptr-to-target (ptr)
+  (or (gethash (id ptr) *fsdata*)
+      (setf (gethash (id ptr) *fsdata*)
+            (read-file-from-disk (id ptr)))))
 
 (defun path-to-string (path)
   (format nil "~{~A~^/~}"
@@ -77,25 +189,22 @@
 (defmethod file-print-name ((name string) (type regular-file-ptr))
   (format nil "~S" name))
 
-(defun allocate-id (id object)
-  (setf (gethash id *fsdata*) object))
-
-(defun release-id (id)
-  (remhash id *fsdata*)
-  (queue-add (gethash :free-ids *fsdata*) id))
-
-(defun init-fsdata ()
+(defun init-empty-fsdata ()
+  (clrhash *fsdata*)
   (setf (gethash :id-counter *fsdata*) 0
         (gethash :free-ids *fsdata*) (make-instance 'queue)
-        (gethash :root-id *fsdata*) (id *root*))
-  (allocate-id (id *root*) *root*))
+        (gethash :root-id *fsdata*) 0
+        (gethash 0 *fsdata*) (make-empty-root-dir)))
 
 (defun get-root-dir ()
-  (gethash (gethash :root-id *fsdata*) *fsdata*))
+  (let ((id (gethash :root-id *fsdata*)))
+    (or (gethash id *fsdata*)
+        (setf (gethash id *fsdata*) (read-file-from-disk id)))))
 
 (defun next-id ()
   (let ((free (queue-pop (gethash :free-ids *fsdata*))))
-    (or free (incf (gethash :id-counter *fsdata*)))))
+    (prog1 (or free (incf (gethash :id-counter *fsdata*)))
+      (write-fsdata-to-disk))))
 
 (defun valid-name-p (object)
   (and (stringp object)
@@ -143,6 +252,8 @@
         :for n :upfrom 0
         :unless (= n nth) :collect item))
 
+;;; Modify, create, move etc. files
+
 (defun error-file-exists (name)
   (error 'file-system-error
          :message (format nil "File ~A already exists." name)))
@@ -172,7 +283,9 @@
         (setf content (cons new content)
               content (subseq content 0 (min *max-file-versions*
                                              (length content)))
-              changed t)))))
+              changed t)
+        (update-atime file)
+        content))))
 
 (defun delete-from-regular-file (file nth)
   (assert (typep file 'regular-file))
@@ -182,7 +295,9 @@
         (setf content (cons new content)
               content (subseq content 0 (min *max-file-versions*
                                              (length content)))
-              changed t)))))
+              changed t)
+        (update-atime file)
+        content))))
 
 (defun revert-to-version (file version)
   (assert (typep file 'regular-file))
@@ -195,10 +310,14 @@
       (setf content (cons (nth version content) content)
             content (subseq content 0 (min *max-file-versions*
                                            (length content)))
-            changed t))))
+            changed t)
+      (update-atime file)
+      content)))
 
 (defun read-regular-file (file &optional (version 0))
   (assert (typep file 'regular-file))
+  (bt:with-lock-held ((lock file))
+    (update-atime file))
   (if (<= 0 version (1- (length (content file))))
       (nth version (content file))
       (error 'file-system-error
@@ -207,13 +326,16 @@
 
 (defun delete-file-permanently (dir name)
   ;; This does not check subdirectories.
-  (let ((ptr (gethash name (files dir))))
-    (if (typep ptr 'pointer)
-        (progn
-          (bt:with-lock-held ((lock dir))
-            (remhash name (files dir)))
-          (release-id (id ptr)))
-        (error-file-not-found name))))
+  (bt:with-lock-held ((lock dir))
+    (update-atime dir)
+    (let ((ptr (gethash name (files dir))))
+      (if (typep ptr 'pointer)
+          (progn
+            (remhash name (files dir))
+            (ignore-errors
+              (delete-file (make-id-file-pathname (id ptr))))
+            (release-id (id ptr)))
+          (error-file-not-found name)))))
 
 ;; TODO: copy-file, move-file
 
@@ -222,35 +344,40 @@
 
 (defun make-dir-public (dir)
   (bt:with-lock-held ((lock dir))
-    (setf (owners dir) :public
-          (changed dir) t)))
+    (update-atime dir)
+    (setf (changed dir) t
+          (owners dir) :public)))
 
 (defun add-to-owners (dir user)
   (with-slots (owners lock changed) dir
     (bt:with-lock-held (lock)
+      (update-atime dir)
       (unless (listp owners)
         ;; Probably :PUBLIC
         (setf owners nil))
-      (pushnew user owners :test #'string-equal)
-      (setf changed t))))
+      (setf changed t)
+      (pushnew user owners :test #'string-equal))))
 
 (defun delete-from-owners (dir nth)
   (with-slots (owners lock changed) dir
     (bt:with-lock-held (lock)
-      (setf owners (remove-nth nth owners)
-            changed t))))
+      (update-atime dir)
+      (setf changed t
+            owners (remove-nth nth owners)))))
 
 (defun add-to-writers (dir user)
   (with-slots (writers lock changed) dir
     (bt:with-lock-held (lock)
-      (pushnew user writers :test #'string-equal)
-      (setf changed t))))
+      (update-atime dir)
+      (setf changed t)
+      (pushnew user writers :test #'string-equal))))
 
 (defun delete-from-writers (dir nth)
   (with-slots (writers lock changed) dir
     (bt:with-lock-held (lock)
-      (setf writers (remove-nth nth writers)
-            changed t))))
+      (update-atime dir)
+      (setf changed t
+            writers (remove-nth nth writers)))))
 
 (defun match-user (pattern user)
   (let* ((patterns (split-sequence #\* pattern))
@@ -291,7 +418,7 @@
                                (owners dir)))
                     (return-from ownerp t))
                    ((parent dir)
-                    (ownp (follow (parent dir))))
+                    (ownp (from-ptr-to-target (parent dir))))
                    (t (return-from ownerp nil)))))
     (bt:with-lock-held ((lock dir))
       (ownp dir))))
@@ -308,10 +435,12 @@
       (ownerp dir user)))
 
 (defun list-files (dir)
+  (bt:with-lock-held ((lock dir))
+    (update-atime dir))
   (loop :for name :being :each :hash-key :in (files dir)
-        :using (hash-value val)
-        :collect (file-print-name name val) :into all-files
-        :finally (return (sort all-files #'string-lessp))))
+        :using (hash-value ptr)
+        :collect (cons name ptr) :into all-files
+        :finally (return (sort all-files #'string-lessp :key #'car))))
 
 (defun create-directory (dir name)
   (if (gethash name (files dir))
@@ -321,10 +450,11 @@
                                   :parent (make-instance 'directory-ptr :id id)
                                   :id (next-id))))
           (bt:with-lock-held (lock)
+            (update-atime dir)
             (setf (gethash name files) (make-instance 'directory-ptr
                                                       :id (id new))
                   changed t))
-          (allocate-id (id new) new)))))
+          (setf (gethash (id new) *fsdata*) new)))))
 
 (defun create-regular-file (dir name)
   (if (gethash name (files dir))
@@ -332,10 +462,11 @@
       (with-slots (files changed lock) dir
         (let ((file (make-instance 'regular-file :id (next-id))))
           (bt:with-lock-held (lock)
+            (update-atime dir)
             (setf (gethash name files) (make-instance 'regular-file-ptr
                                                       :id (id file))
                   changed t))
-          (allocate-id (id file) file)))))
+          (setf (gethash (id file) *fsdata*) file)))))
 
 (defun find-target (dir path)
   (cond
@@ -345,14 +476,14 @@
     ((eql :parent (first path))
      (let ((parent-ptr (parent dir)))
        (if (typep parent-ptr 'directory-ptr)
-           (find-target (follow parent-ptr) (rest path))
+           (find-target (from-ptr-to-target parent-ptr) (rest path))
            (error 'file-system-error :message "Parent directory not found."))))
     ((eql :current (first path))
      (find-target dir (rest path)))
     ((stringp (first path))
      (let ((ptr (gethash (first path) (files dir))))
        (if ptr
-           (find-target (follow ptr) (rest path))
+           (find-target (from-ptr-to-target ptr) (rest path))
            (error 'file-system-error
                   :message (format nil "Directory not found: ~A"
                                    (first path))))))
@@ -365,8 +496,58 @@
              (funcall function subdir)
              (map-subdirs function subdir))
        (loop :for value :being :each :hash-value :in (files dir)
-             :if (typep value 'directory-ptr) :collect (follow value))))
+             :if (typep value 'directory-ptr)
+             :collect (from-ptr-to-target value))))
 
 (defmacro do-subdirs ((var dir &optional result-form) &body body)
   `(progn (map-subdirs (lambda (,var) ,@body) ,dir)
           ,result-form))
+
+;;; Description of print/read format of files
+;;;
+;;; Files' print format consists of three or more Lisp objects which are
+;;; readable with CL:READ function: type, version and content object(s).
+;;;
+;;; The first object identifies the type of the file. It must be a
+;;; keyword symbol (e.g. :DIRECTORY or :REGULAR-FILE).
+;;;
+;;; The second object is the version number (integer) of the file
+;;; format. It's a hint for the reader how the rest of the objects
+;;; should be read.
+;;;
+;;; The third and the rest of the objects are the content of the file.
+;;; Their format is generally unspecified but the printer and reader
+;;; must agree that a specific file type and version number (see above)
+;;; means a specific content format.
+
+(defgeneric print-file (file &optional stream))
+
+(defmethod print-file ((dir directory)
+                       &optional (stream *standard-output*))
+  (with-standard-io-syntax
+    ;; If the output format changes increase the version number and add
+    ;; a compatible reader function.
+    (format stream "~S ~S~%" :directory 1)
+    ;; Slots in order: id, parent, owners, writers, files.
+    (format stream "~S ~S ~S ~S~%~S~%"
+            (id dir)
+            (if (parent dir) (id (parent dir)))
+            (owners dir)
+            (writers dir)
+            (let (alist)
+              (maphash (lambda (key value)
+                         (push (etypecase value
+                                 (regular-file-ptr (list key :r (id value)))
+                                 (directory-ptr (list key :d (id value))))
+                               alist))
+                       (files dir))
+              alist))))
+
+(defmethod print-file ((file regular-file)
+                       &optional (stream *standard-output*))
+  (with-standard-io-syntax
+    ;; If the output format changes increase the version number and add
+    ;; a compatible reader function.
+    (format stream "~S ~S~%" :regular-file 1)
+    ;; Slots in order: id, content.
+    (format stream "~S ~S~%" (id file) (content file))))
