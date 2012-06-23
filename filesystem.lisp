@@ -17,7 +17,7 @@
 ;; <http://www.gnu.org/licenses/>.
 
 (defpackage #:filesystem
-  (:use #:cl)
+  (:use #:cl #:split-sequence)
   (:shadow #:directory)
   (:import-from #:general
                 #:queue #:queue-add #:queue-pop #:queue-clear
@@ -104,7 +104,7 @@
        (every #'graphic-char-p object)))
 
 (defun parse-path-string (string)
-  (let ((path (split-sequence:split-sequence #\/ string)))
+  (let ((path (split-sequence #\/ string)))
     (when (string= "" (first path))
       (setf (first path) :root))
     (setf path (delete "" path :test #'string=)
@@ -253,7 +253,7 @@
             changed t))))
 
 (defun match-user (pattern user)
-  (let* ((patterns (split-sequence:split-sequence #\* pattern))
+  (let* ((patterns (split-sequence #\* pattern))
          (first (first patterns))
          middle last)
 
