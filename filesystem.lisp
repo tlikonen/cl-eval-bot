@@ -19,7 +19,8 @@
 (defpackage #:filesystem
   (:use #:cl #:split-sequence)
   (:shadow #:directory)
-  (:import-from #:general
+  (:import-from #:clbot-common
+                #:*data-dir*
                 #:queue #:queue-add #:queue-pop #:queue-clear
                 #:queue-length #:queue-list))
 
@@ -55,7 +56,7 @@
 
 (defvar *fsdata-dir*
   (merge-pathnames (make-pathname :directory '(:relative "fs"))
-                   general:*data-dir*))
+                   *data-dir*))
 
 (defvar *fsdata-filename* (make-pathname :name "fsdata"))
 
