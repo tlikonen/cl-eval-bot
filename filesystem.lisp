@@ -34,7 +34,7 @@
 
 (defclass directory (file)
   ((owners :accessor owners :initarg :owners :initform nil)
-   (writers :accessor writers :initarg :writers :initform nil)
+   (editors :accessor editors :initarg :editors :initform nil)
    (files :reader files :initform (make-hash-table :test #'equal))
    (parent :accessor parent :initarg :parent)))
 
@@ -105,13 +105,13 @@
                  :changed nil))
 
 (defun read-directory-from-stream-1 (stream)
-  ;; Slots in the stream: id, parent id, owners, writers, files.
+  ;; Slots in the stream: id, parent id, owners, editors, files.
   (let ((dir (make-instance
               'directory
               :id (read stream)
               :parent (make-instance 'directory-ptr :id (read stream))
               :owners (read stream)
-              :writers (read stream)
+              :editors (read stream)
               :changed nil)))
     (loop :for (name type id) :in (read stream)
           :do (setf (gethash name (files dir))
@@ -366,19 +366,19 @@
       (setf changed t
             owners (remove-nth nth owners)))))
 
-(defun add-to-writers (dir user)
-  (with-slots (writers lock changed) dir
+(defun add-to-editors (dir user)
+  (with-slots (editors lock changed) dir
     (bt:with-lock-held (lock)
       (update-atime dir)
       (setf changed t)
-      (pushnew user writers :test #'string-equal))))
+      (pushnew user editors :test #'string-equal))))
 
-(defun delete-from-writers (dir nth)
-  (with-slots (writers lock changed) dir
+(defun delete-from-editors (dir nth)
+  (with-slots (editors lock changed) dir
     (bt:with-lock-held (lock)
       (update-atime dir)
       (setf changed t
-            writers (remove-nth nth writers)))))
+            editors (remove-nth nth editors)))))
 
 (defun match-user (pattern user)
   (let* ((patterns (split-sequence #\* pattern))
@@ -424,11 +424,11 @@
     (bt:with-lock-held ((lock dir))
       (ownp dir))))
 
-(defun write-access-p (dir user)
+(defun editor-access-p (dir user)
   (or (public-dir-p dir)
       (some (lambda (pat)
               (match-user pat user))
-            (writers dir))
+            (editors dir))
       (ownerp dir user)))
 
 (defun mkdir-access-p (dir user)
@@ -529,12 +529,12 @@
     ;; If the output format changes increase the version number and add
     ;; a compatible reader function.
     (format stream "~S ~S~%" :directory 1)
-    ;; Slots in order: id, parent, owners, writers, files.
+    ;; Slots in order: id, parent, owners, editors, files.
     (format stream "~S ~S ~S ~S~%~S~%"
             (id dir)
             (if (parent dir) (id (parent dir)))
             (owners dir)
-            (writers dir)
+            (editors dir)
             (let (alist)
               (maphash (lambda (key value)
                          (push (etypecase value
