@@ -346,6 +346,8 @@
         (let ((newfile (make-instance 'regular-file
                                       :id (next-id)
                                       :content (content file))))
+          (bt:with-lock-held ((lock file))
+            (update-atime file))
           (update-atime destdir)
           (setf (gethash newname (files destdir)) (make-instance
                                                    'regular-file-ptr
