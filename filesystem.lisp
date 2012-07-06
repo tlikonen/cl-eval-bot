@@ -333,6 +333,7 @@
       (if (typep ptr 'pointer)
           (progn
             (remhash name (files dir))
+            (setf (changed dir) t)
             (ignore-errors
               (delete-file (make-id-file-pathname (id ptr))))
             (release-id (id ptr)))
