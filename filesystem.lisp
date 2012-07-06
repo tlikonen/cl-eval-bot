@@ -340,6 +340,61 @@
 
 ;; TODO: copy-file, move-file
 
+;;; Description of access control
+;;; =============================
+;;;
+;;; In the filesystem's access control there are four concepts:
+;;; "directory's owner", "public directory", "directory's editor" and
+;;; "all users". Access control data is stored in directory objects and
+;;; there an IRC user can be an owner of a directory and she can be an
+;;; editor in a directory. The access concepts are described below.
+;;;
+;;; Owners
+;;; ------
+;;;
+;;; Owners own a directory which means that they fully control the
+;;; directory. They can create, move and delete subdirectories in their
+;;; own directory. They can also delete or move the owned directory
+;;; itself, but moving a directory requires owner access to the
+;;; destination directory too (or the destination directory must be a
+;;; public directory). Owners can create, modify, move and delete files
+;;; in their own directory. Owners can add or remove other owners and
+;;; add or remove editors for their directory. Only owners can list
+;;; directory object's owner and editor data.
+;;;
+;;; Ownership is inherited to subdirectories. If owner of a directory
+;;; creates a subdirectory she is automatically owner of the
+;;; subdirectory. The new subdirectory has ownership set to "INHERIT"
+;;; which means that ownership is controlled in its parent directory (or
+;;; its parent or its parent or...). The owner of the root directory is
+;;; owner of all directories.
+;;;
+;;; Owner can delete anybody, even herself, from the list of directory's
+;;; owners. If all owners are deleted from a directory the directory
+;;; becomes public.
+;;;
+;;; Public directory
+;;; ----------------
+;;;
+;;; In a public directory everybody can create subdirectories. User who
+;;; creates a subdirectory is automatically owner of the subdirectory.
+;;; In a public directory everybody has also editor access.
+;;;
+;;; Editors
+;;; -------
+;;;
+;;; If user has an editor access to a directory she can add, modify and
+;;; delete in that directory. She can also move files, though moving
+;;; requires an editor or owner access to the destination directory too
+;;; (or the destination must be a public directory).
+;;;
+;;; All users
+;;; ---------
+;;;
+;;; All users can list directories' content everywhere. All users can
+;;; also print files' content everywhere. There's no restrictions for
+;;; read access.
+
 (defun public-dir-p (dir)
   (eql :public (owners dir)))
 
