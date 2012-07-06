@@ -349,12 +349,18 @@
     (setf (changed dir) t
           (owners dir) :public)))
 
+(defun make-dir-inherit-ownership (dir)
+  (bt:with-lock-held ((lock dir))
+    (update-atime dir)
+    (setf (changed dir) t
+          (owners dir) :inherit)))
+
 (defun add-to-owners (dir user)
   (with-slots (owners lock changed) dir
     (bt:with-lock-held (lock)
       (update-atime dir)
       (unless (listp owners)
-        ;; Probably :PUBLIC
+        ;; Probably :PUBLIC or :INHERIT
         (setf owners nil))
       (setf changed t)
       (pushnew user owners :test #'string-equal))))
@@ -411,6 +417,9 @@
 
          user)))
 
+(defun inherit-ownership-p (dir)
+  (eql :inherit (owners dir)))
+
 (defun ownerp (dir user)
   (labels ((ownp (dir)
              (cond ((and (listp (owners dir))
@@ -418,7 +427,8 @@
                                  (match-user pat user))
                                (owners dir)))
                     (return-from ownerp t))
-                   ((parent dir)
+                   ((and (inherit-ownership-p dir)
+                         (parent dir))
                     (ownp (from-ptr-to-target (parent dir))))
                    (t (return-from ownerp nil)))))
     (bt:with-lock-held ((lock dir))
