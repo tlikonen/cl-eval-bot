@@ -352,8 +352,21 @@
                 (changed destdir) t
                 (gethash (id newfile) *fsdata*) newfile)))))
 
-
-;;; TODO: move-regular-file
+(defun move-file (srcdir oldname destdir
+                  &optional (newname oldname))
+  ;; Move directory or regular file
+  (if (gethash newname (files destdir))
+      (error-file-exists name)
+      (progn
+        (bt:with-lock-held ((lock destdir))
+          (update-atime destdir)
+          (setf (gethash newname (files destdir)) (gethash oldname
+                                                           (files srcdir))
+                (changed destdir) t))
+        (bt:with-lock-held ((lock srcdir))
+          (remhash oldname (files srcdir))
+          (update-atime srcdir)
+          (setf (changed srcdir) t)))))
 
 
 ;;; Description of access control
