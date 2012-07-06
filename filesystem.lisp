@@ -99,12 +99,18 @@
         :if (and (typep file 'file) (changed file))
         :do (write-file-to-disk file)))
 
-(defun read-regular-file-from-stream-1 (stream)
+(defgeneric read-file-from-stream (filetype version stream))
+
+(defmethod read-file-from-stream ((type (eql :regular-file))
+                                  (version (eql 1))
+                                  (stream stream))
   ;; Slots in the stream: id, content.
   (make-instance 'regular-file :id (read stream) :content (read stream)
                  :changed nil))
 
-(defun read-directory-from-stream-1 (stream)
+(defmethod read-file-from-stream ((type (eql :directory))
+                                  (version (eql 1))
+                                  (stream stream))
   ;; Slots in the stream: id, parent id, owners, editors, files.
   (let ((dir (make-instance
               'directory
@@ -129,13 +135,7 @@
         (let* ((*read-eval* nil)
                (filetype (read s))
                (version (read s)))
-          (ecase filetype
-            (:regular-file
-             (ecase version
-               (1 (read-regular-file-from-stream-1 s))))
-            (:directory
-             (ecase version
-               (1 (read-directory-from-stream-1 s))))))))))
+          (read-file-from-stream filetype version s))))))
 
 (defun write-fsdata-to-disk ()
   (let ((path (merge-pathnames *fsdata-filename* *fsdata-dir*)))
