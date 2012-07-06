@@ -338,7 +338,23 @@
             (release-id (id ptr)))
           (error-file-not-found name)))))
 
-;; TODO: copy-file, move-file
+(defun copy-regular-file (file destdir newname)
+  (if (gethash newname (files destdir))
+      (error-file-exists name)
+      (bt:with-lock-held ((lock destdir))
+        (let ((newfile (make-instance 'regular-file
+                                      :id (next-id)
+                                      :content (content file))))
+          (update-atime destdir)
+          (setf (gethash newname (files destdir)) (make-instance
+                                                   'regular-file-ptr
+                                                   :id (id newfile))
+                (changed destdir) t
+                (gethash (id newfile) *fsdata*) newfile)))))
+
+
+;;; TODO: move-regular-file
+
 
 ;;; Description of access control
 ;;; =============================
