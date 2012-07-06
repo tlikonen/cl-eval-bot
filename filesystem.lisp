@@ -359,7 +359,7 @@
       (setf changed t)
       (pushnew user owners :test #'string-equal))))
 
-(defun delete-from-owners (dir nth)
+(defun remove-from-owners (dir nth)
   (with-slots (owners lock changed) dir
     (bt:with-lock-held (lock)
       (update-atime dir)
@@ -373,7 +373,7 @@
       (setf changed t)
       (pushnew user editors :test #'string-equal))))
 
-(defun delete-from-editors (dir nth)
+(defun remove-from-editors (dir nth)
   (with-slots (editors lock changed) dir
     (bt:with-lock-held (lock)
       (update-atime dir)
