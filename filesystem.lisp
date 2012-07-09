@@ -26,6 +26,8 @@
 
 (in-package #:filesystem)
 
+(declaim (optimize (safety 3)))
+
 (defclass file ()
   ((id :reader id :initarg :id)
    (changed :accessor changed :initarg :changed :initform t)
