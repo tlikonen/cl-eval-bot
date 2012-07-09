@@ -391,14 +391,37 @@
     (sandbox-init sandbox-name)
 
     (with-thread ("eval and print" :timeout *eval-timeout*)
-      (let ((string (clean-string (with-output-to-string (stream)
-                                    (sandbox-repl sandbox-name
-                                                  contents stream)))))
-        (when (plusp (length string))
-          (let ((msg (make-instance 'client-privmsg :target target
-                                    :contents string)))
-            (send :terminal msg)
-            (queue-add (send-queue client) msg))))
+      (handler-case
+          (let ((string (clean-string (with-output-to-string (stream)
+                                        (sandbox-repl sandbox-name
+                                                      contents stream)))))
+            (when (plusp (length string))
+              (let ((msg (make-instance 'client-privmsg :target target
+                                        :contents string)))
+                (send :terminal msg)
+                (queue-add (send-queue client) msg))))
+
+        (filesystem-command (c)
+          (with-thread ("filesystem command")
+            (handler-case
+                (let ((values (multiple-value-list
+                               (funcall (fs-cmd c) (prefix message) (cd c)
+                                        (fs-args c)))))
+                  (loop :for string :in values
+                        :for msg := (make-instance
+                                     'client-privmsg
+                                     :target target
+                                     :content (irc-fmt "~A" string))
+                        :do
+                        (queue-add (send-queue client) msg)
+                        (send :terminal msg)))
+
+              (error (c)
+                (let ((msg (make-instance
+                            'client-privmsg :target target
+                            :contents (irc-fmt ";; ~A: ~A" (type-of c) c))))
+                  (send :terminal msg)
+                  (queue-add (send-queue client) msg)))))))
 
       :timeout
       (let ((msg (make-instance 'client-privmsg :target target

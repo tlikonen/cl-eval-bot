@@ -133,7 +133,7 @@
 
 (defun reset ()
   (delete-package *sandbox*)
-  (make-package *sandbox* :use '(#:sandbox-cl))
+  (make-package *sandbox* :use '(#:sandbox-cl #:sandbox-fs))
   (loop :for name :in '("+" "++" "+++" "*" "**" "***" "/" "//" "///" "-")
         :do (eval `(defparameter ,(intern name *sandbox*) nil)))
   (loop :for fn :in '(+ - * /)
@@ -141,6 +141,21 @@
         :do (setf (get symbol :sandbox-locked) t)
         (eval `(defun ,symbol (&rest args)
                  (apply ',fn args))))
+
+  (let ((cd (intern "CD" *sandbox*)))
+    (setf (get cd :sandbox-locked) t
+          (get cd :sandbox-cd) nil)
+
+    (eval `(defun ,cd (&rest args)
+             (signal 'clbot-common:filesystem-command
+                     :fs-cmd 'filesystem::cd
+                     :fs-args args
+                     ;; Function CD is exceptional: The condition's
+                     ;; current directory slot is the sandbox's CD
+                     ;; symbol itself. FILESYSTEM:CD may need to modify
+                     ;; the symbol's :SANDBOX-CD property.
+                     :cd ',cd))))
+
   *sandbox*)
 
 (defun repl (string &optional (stream *standard-output*))
@@ -172,6 +187,9 @@
                 (loop (setf values (multiple-value-list
                                     (eval (prog1 (setf form (sread s))
                                             (ssetq "-" form)))))))
+
+            (clbot-common:filesystem-command (c)
+              (signal c))
 
             (all-read ()
               (sandbox-print values stream))
