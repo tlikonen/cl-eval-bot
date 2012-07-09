@@ -21,6 +21,7 @@
   (:export #:with-thread #:update-sandbox-usage #:delete-unused-packages
            #:delete-all-packages #:list-user-sandbox-packages
            #:*data-dir* #:user-to-sandbox-name
+           #:filesystem-command #:fs-cmd #:fs-args #:cd
            #:queue #:queue-add #:queue-pop #:queue-clear
            #:queue-length #:queue-list))
 
@@ -54,6 +55,11 @@
 (defvar *data-dir*
   (merge-pathnames (make-pathname :directory '(:relative ".clbot"))
                    (user-homedir-pathname)))
+
+(define-condition filesystem-command ()
+  ((fs-cmd :reader fs-cmd :initarg :fs-cmd)
+   (fs-args :reader fs-args :initarg :fs-args)
+   (cd :reader cd :initarg :cd)))
 
 (defclass sandbox-package ()
   ((lock :reader lock :initform (bt:make-lock "sandbox-package"))
