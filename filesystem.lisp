@@ -47,7 +47,7 @@
 (defclass directory-ptr (pointer) nil)
 (defclass regular-file-ptr (pointer) nil)
 
-(define-condition file-system-error (error)
+(define-condition filesystem-error (error)
   ((message :initarg :message))
   (:report (lambda (c s) (princ (slot-value c 'message) s))))
 
@@ -258,15 +258,15 @@
 ;;; Modify, create, move etc. files
 
 (defun error-file-exists (name)
-  (error 'file-system-error
+  (error 'filesystem-error
          :message (format nil "File ~A already exists." name)))
 
 (defun error-not-regular-file (name)
-  (error 'file-system-error
+  (error 'filesystem-error
          :message (format nil "~A is not a regular file." name)))
 
 (defun error-file-not-found (name)
-  (error 'file-system-error
+  (error 'filesystem-error
          :message (format nil "File not found: ~A" name)))
 
 (defvar *max-file-versions* 5)
@@ -279,7 +279,7 @@
                    (insert-before-nth nth line (first content))
                    (append (first content) (list line)))))
       (when (> (length new) *max-file-lines*)
-        (error 'file-system-error
+        (error 'filesystem-error
                :message "The file is full (max ~D lines)."
                *max-file-lines*))
       (bt:with-lock-held (lock)
@@ -306,7 +306,7 @@
   (assert (typep file 'regular-file))
   (with-slots (lock content changed) file
     (unless (<= 0 version (1- (length content)))
-      (error 'file-system-error
+      (error 'filesystem-error
              :message (format nil "Available versions 0-~D."
                               (length content))))
     (bt:with-lock-held (lock)
@@ -323,7 +323,7 @@
     (update-atime file))
   (if (<= 0 version (1- (length (content file))))
       (nth version (content file))
-      (error 'file-system-error
+      (error 'filesystem-error
              :message (format nil "Available versions 0-~D."
                               (1- (length (content file)))))))
 
@@ -577,17 +577,17 @@
      (let ((parent-ptr (parent dir)))
        (if (typep parent-ptr 'directory-ptr)
            (find-target (from-ptr-to-target parent-ptr) (rest path))
-           (error 'file-system-error :message "Parent directory not found."))))
+           (error 'filesystem-error :message "Parent directory not found."))))
     ((eql :current (first path))
      (find-target dir (rest path)))
     ((stringp (first path))
      (let ((ptr (gethash (first path) (files dir))))
        (if ptr
            (find-target (from-ptr-to-target ptr) (rest path))
-           (error 'file-system-error
+           (error 'filesystem-error
                   :message (format nil "Directory not found: ~A"
                                    (first path))))))
-    (t (error 'file-system-error
+    (t (error 'filesystem-error
               :message (format nil "Unknown path component: ~A"
                                (first path))))))
 
