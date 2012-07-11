@@ -651,3 +651,34 @@
     (format stream "~S ~S~%" :regular-file 1)
     ;; Slots in order: id, content.
     (format stream "~S ~S~%" (id file) (content file))))
+
+;;; Filesystem commands
+;;;
+;;; Filesystem user commands are called with arguments nick!user@host
+;;; (string), currect directory (string), command's arguments given by
+;;; IRC user (list).
+;;;
+;;; Commands' return values must be strings and they will be sent to the
+;;; related IRC target. There can be multiple values. Commands can also
+;;; signal an error condition which is also sent to IRC.
+
+(defun assert-argument-count (required optional arg-list)
+  (let ((len (length arg-list)))
+    (if (and (>= len required)
+             (<= len (+ required optional)))
+        t
+        (error 'filesystem-error
+               :message (format nil "Invalid number of arguments ~
+                                        (~D required, ~D optional)."
+                                required optional)))))
+
+(defun assert-argument-types (types args)
+  (loop :for type :in types
+        :for arg :in args
+        :for count :upfrom 1
+        :unless (typep arg type)
+        :do (error 'filesystem-error
+                   :message (format nil "Invalid argument type: the ~:R ~
+                                            argument must be ~A."
+                                    count type))
+        :finally (return t)))
