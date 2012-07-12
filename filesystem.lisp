@@ -630,7 +630,7 @@
     ;; If the output format changes increase the version number and add
     ;; a compatible reader function.
     (format stream "~S ~S~%" :directory 1)
-    ;; Slots in order: id, parent, owners, editors, files.
+    ;; Slots in order: id, parent id, owners, editors, files.
     (format stream "~S ~S ~S ~S~%~S~%"
             (id dir)
             (if (parent dir) (id (parent dir)))
