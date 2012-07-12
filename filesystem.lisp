@@ -191,6 +191,24 @@
                                 path))))
     (if (string= string "") "/" string)))
 
+(defun dir-to-path (dir)
+  (let (path)
+    (labels ((name-of-this (dir)
+               (if (parent dir)
+                   (let ((parent-dir (from-ptr-to-target (parent dir))))
+                     (block nil
+                       (maphash (lambda (name ptr)
+                                  (when (and (typep ptr 'directory-ptr)
+                                             (= (id dir) (id ptr)))
+                                    (push name path)
+                                    (return)))
+                                (files parent-dir)))
+                     (name-of-this parent-dir))
+                   (push :root path))))
+
+      (name-of-this dir))
+    path))
+
 (defgeneric file-print-name (name object))
 
 (defmethod file-print-name ((name string) (type directory-ptr))
