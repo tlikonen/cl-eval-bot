@@ -707,3 +707,26 @@
                                             argument must be ~A."
                                     count type))
         :finally (return t)))
+
+(defun cd (user cd-symbol args)
+  (declare (ignore user))
+  (assert-argument-count 0 1 args)
+  (assert-argument-types '(string) args)
+
+  (if args
+      (let* ((combined (append '(:root) (get cd-symbol :sandbox-cd)
+                               (parse-path-string (first args))))
+             (target (ignore-errors (find-target (get-root-dir) combined))))
+        (if target
+            (let ((new (dir-to-path target)))
+              (setf (get cd-symbol :sandbox-cd) new)
+              (format nil "Current directory: ~A" (path-to-string new)))
+            (error 'filesystem-error
+                   :message (format nil "Couldn't find directory \"~A\"."
+                                    (first args)))))
+
+      (let* ((path (get cd-symbol :sandbox-cd))
+             (target (ignore-errors (find-target (get-root-dir) path))))
+        (unless target
+          (setf (get cd-symbol :sandbox-cd) '(:root)))
+        (format nil "Current directory: ~A" (path-to-string path)))))
