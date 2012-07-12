@@ -22,7 +22,7 @@
 (cl:declaim (cl:optimize (cl:safety 3)))
 
 (cl:loop
- :for func :in '()           ;FIXME: Add function's symbols to the list.
+ :for func :in '(ls)
  :do
  (cl:setf (cl:get func :sandbox-locked) cl:t)
  (cl:export (cl:list func))

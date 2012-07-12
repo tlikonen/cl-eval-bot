@@ -730,3 +730,24 @@
         (unless target
           (setf (get cd-symbol :sandbox-cd) '(:root)))
         (format nil "Current directory: ~A" (path-to-string path)))))
+
+(defun ls (user cd args)
+  (declare (ignore user))
+  (assert-argument-count 0 2 args)
+  (assert-argument-types '(string (integer 0 *)) args)
+
+  (let* ((path (parse-path-string (or (first args) ".")))
+         (dir (ignore-errors (find-target (find-target (get-root-dir) cd) path)))
+         (start (or (second args) 0)))
+    (unless (typep dir 'directory)
+      (error 'filesystem-error
+             :message (format nil "Couldn't find directory ~A"
+                              (path-to-string (append cd path)))))
+
+    (let ((filelist (list-files dir)))
+      (format nil "Directory ~A: ~{~A~^ ~}"
+              (path-to-string (dir-to-path dir))
+              (loop :for (name . ptr) :in (subseq filelist start)
+                    :collect (format nil "\"~A\"" (file-print-name name ptr))
+                    :into files
+                    :finally (return (if files files '("(empty)"))))))))
