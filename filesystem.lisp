@@ -212,10 +212,10 @@
 (defgeneric file-print-name (name object))
 
 (defmethod file-print-name ((name string) (type directory-ptr))
-  (format nil "~S/" name))
+  (format nil "~A/" name))
 
 (defmethod file-print-name ((name string) (type regular-file-ptr))
-  (format nil "~S" name))
+  (format nil "~A" name))
 
 (defun init-empty-fsdata ()
   (clrhash *fsdata*)
