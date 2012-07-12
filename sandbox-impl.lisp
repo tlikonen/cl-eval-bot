@@ -144,7 +144,7 @@
 
   (let ((cd (intern "CD" *sandbox*)))
     (setf (get cd :sandbox-locked) t
-          (get cd :sandbox-cd) nil)
+          (get cd :sandbox-cd) '(:root))
 
     (eval `(defun ,cd (&rest args)
              (signal 'clbot-common:filesystem-command
