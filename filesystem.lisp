@@ -117,7 +117,9 @@
   (let ((dir (make-instance
               'directory
               :id (read stream)
-              :parent (make-instance 'directory-ptr :id (read stream))
+              :parent (let ((parent-id (read stream)))
+                        (when parent-id
+                          (make-instance 'directory-ptr :id parent-id)))
               :owners (read stream)
               :editors (read stream)
               :changed nil)))
