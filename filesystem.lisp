@@ -178,13 +178,18 @@
             (read-file-from-disk (id ptr)))))
 
 (defun path-to-string (path)
-  (format nil "~{~A~^/~}"
-          (mapcar (lambda (item)
-                    (if (stringp item)
-                        item
-                        (ecase item
-                          (:root "") (:parent "..") (:current "."))))
-                  path)))
+  (let ((pos (position :root path :from-end t)))
+    (when pos
+      (setf path (nthcdr pos path))))
+  (let ((string (format nil "~{~A~^/~}"
+                        (mapcar (lambda (item)
+                                  (cond ((stringp item) item)
+                                        ((eql :root item) "")
+                                        ((eql :parent item) "..")
+                                        ((eql :current item) ".")
+                                        (t (error "Invalid path component"))))
+                                path))))
+    (if (string= string "") "/" string)))
 
 (defgeneric file-print-name (name object))
 
