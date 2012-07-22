@@ -412,7 +412,7 @@
                         :for msg := (make-instance
                                      'client-privmsg
                                      :target target
-                                     :content (bot-message "~A" string))
+                                     :contents (bot-message "~A" string))
                         :do
                         (queue-add (send-queue client) msg)
                         (send :terminal msg)))
