@@ -30,8 +30,7 @@
   `(cl:defun ,func (cl:&rest args)
      (cl:signal
       'clbot-common:filesystem-command
-      :fs-cmd (cl:find-symbol (cl:symbol-name func)
-                              "FILESYSTEM")
+      :fs-cmd (cl:find-symbol (cl:symbol-name ',func) "FILESYSTEM")
       :fs-args args
       :cd (cl:get (cl:find-symbol "CD" sandbox-impl:*sandbox*)
                   :sandbox-cd)))))
