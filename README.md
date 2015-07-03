@@ -77,10 +77,10 @@ etc. Here is an example on how to run the bot.
 
  6. Use the bot!
 
-        somenick> ,(values 1 2 3)
-        eval-bot> => 1, 2, 3
-        somenick> ,help
-        eval-bot> [bot prints information]
+        <somenick> ,(values 1 2 3)
+        <eval-bot> => 1, 2, 3
+        <somenick> ,help
+        <eval-bot> [bot prints information]
 
     Comma `,` is the default prefix for code evaluation. It can be
     changed with variable `*eval-prefix*`. Not all Common Lisp's
