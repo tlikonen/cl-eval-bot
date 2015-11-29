@@ -121,6 +121,8 @@ Copyright and license
 
 Copyright (C) 2012-2013 Teemu Likonen <<tlikonen@iki.fi>>
 
+PGP: [4E10 55DC 84E9 DFF6 13D7 8557 719D 69D3 2453 9450][PGP]
+
 This program is free software: you can redistribute it and/or modify it
 under the terms of the GNU Affero General Public License as published by
 the Free Software Foundation, either version 3 of the License, or (at
@@ -131,6 +133,6 @@ WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero
 General Public License for more details.
 
-You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see
-<<http://www.gnu.org/licenses/agpl.html>>.
+The license text: <http://www.gnu.org/licenses/agpl.html>
+
+[PGP]: http://koti.kapsi.fi/~dtw/pgp-key.asc
