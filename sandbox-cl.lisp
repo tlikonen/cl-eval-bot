@@ -73,9 +73,13 @@
 ;;; General
 
 #+sbcl
-(import-export-symbols                  ;SB-IMPL package is locked.
-  sb-impl::backq-list sb-impl::backq-list* sb-impl::backq-append
-  sb-impl::backq-cons sb-impl::backq-nconc sb-impl::backq-vector)
+(cl:eval-when (:compile-toplevel :load-toplevel :execute)
+  (sb-ext:unlock-package "SB-IMPL"))
+
+#+sbcl
+(import-export-symbols                 ;SB-IMPL package is locked.
+ sb-impl::backq-list sb-impl::backq-list* sb-impl::backq-append
+ sb-impl::backq-cons sb-impl::backq-nconc sb-impl::backq-vector)
 
 (import-export-symbols
   cl:&allow-other-keys cl:&aux cl:&body cl:&environment cl:&key cl:&optional
