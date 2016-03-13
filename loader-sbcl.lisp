@@ -21,7 +21,7 @@
           (delete-file init)))))
 
 (pushnew (make-pathname :directory (pathname-directory *load-pathname*))
-         asdf:*central-registry*)
+         ql:*local-project-directories* :test #'equal)
 
 (ql:quickload '("swank" "eval-bot"))
 
