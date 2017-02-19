@@ -135,4 +135,4 @@ General Public License for more details.
 
 The license text: <http://www.gnu.org/licenses/agpl.html>
 
-[PGP]: http://koti.kapsi.fi/~dtw/pgp-key.asc
+[PGP]: http://www.iki.fi/tlikonen/pgp-key.asc
