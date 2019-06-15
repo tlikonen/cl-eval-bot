@@ -12,7 +12,7 @@
 (asdf:initialize-source-registry
  (list :source-registry
        :ignore-inherited-configuration
-       (list :directory *default-pathname-defaults*)
+       (list :directory (merge-pathnames "src/"))
        (list :tree (merge-pathnames "quicklisp/dists/"))))
 
 (flet ((probe-load (path)
