@@ -1,27 +1,36 @@
 ;;;; Eval-bot loader
 
-(flet ((probe-load (path &optional (default (user-homedir-pathname)))
-         (let ((path (merge-pathnames path default)))
-           (when (probe-file path) (load path))))
+(require :asdf)
+(require :sb-posix)
+
+(asdf:initialize-output-translations
+ (list :output-translations
+       :ignore-inherited-configuration
+       (list (merge-pathnames "**/*.*")
+             (merge-pathnames "build/**/*.*"))))
+
+(asdf:initialize-source-registry
+ (list :source-registry
+       :ignore-inherited-configuration
+       (list :directory *default-pathname-defaults*)
+       (list :tree (merge-pathnames "quicklisp/dists/"))))
+
+(flet ((probe-load (path)
+         (when (probe-file path)
+           (load path)))
        (funcallstr (string &rest args)
          (apply (read-from-string string) args)))
-  (or (probe-load #p"quicklisp/setup.lisp")
-      (probe-load #p".quicklisp/setup.lisp")
+  (or (probe-load "quicklisp/setup.lisp")
       (let ((url "http://beta.quicklisp.org/quicklisp.lisp")
-            (init (nth-value 1 (progn
-                                 (require :sb-posix)
-                                 (funcallstr "sb-posix:mkstemp"
-                                             "/tmp/quicklisp-XXXXXX")))))
+            (init (nth-value 1 (sb-posix:mkstemp "/tmp/quicklisp-XXXXXX"))))
         (unwind-protect
              (progn
                (sb-ext:run-program "wget" (list "-O" init "--" url)
                                    :search t :output t)
                (when (probe-load init)
-                 (funcallstr "quicklisp-quickstart:install")))
+                 (funcallstr "quicklisp-quickstart:install"
+                             :path "quicklisp/")))
           (delete-file init)))))
-
-(pushnew (make-pathname :directory (pathname-directory *load-pathname*))
-         ql:*local-project-directories* :test #'equal)
 
 (ql:quickload '("swank" "eval-bot"))
 
